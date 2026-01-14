@@ -1,0 +1,111 @@
+@{
+    ViewData["Title"] = "Crypto Price Tracker";
+}
+
+<h1>Crypto Price Tracker</h1>
+
+<button id="update-prices-btn" style="padding:10px 20px; margin-bottom:20px;">
+    🔄 Update Prices
+</button>
+<span id="update-status" style="margin-left:15px; font-weight:bold;"></span>
+
+<table id="crypto-table" border="1" cellpadding="10" cellspacing="0" style="width:100%; border-collapse:collapse;">
+    <thead style="background-color:#f5f5f5;">
+        <tr>
+            <th>Icon</th>
+            <th>Name</th>
+            <th>Symbol</th>
+            <th>Price (USD)</th>
+            <th>Trend</th>
+            <th>Last Updated</th>
+        </tr>
+    </thead>
+    <tbody id="crypto-table-body">
+        <!-- JS will populate rows here -->
+    </tbody>
+</table>
+
+<script>
+async function fetchLatestPrices() {
+    try {
+        const res = await fetch('/api/crypto/latest-prices');
+        const prices = await res.json();
+
+        const tableBody = document.getElementById('crypto-table-body');
+        tableBody.innerHTML = ''; // Clear old rows
+
+        prices.forEach(p => {
+            const name = p.name || 'Unknown';
+            const symbol = (p.symbol || '').toUpperCase();
+            const price = p.currentPrice != null ? p.currentPrice : 0;
+            const iconUrl = p.iconUrl || '';
+            const lastUpdated = p.lastUpdated ? new Date(p.lastUpdated).toLocaleString() : 'N/A';
+
+            // Trend calculation
+            let trend = '➖';
+            if (p.previousPrice != null) {
+                if (price > p.previousPrice) trend = '🔼';
+                else if (price < p.previousPrice) trend = '🔽';
+            }
+
+            const row = `
+                <tr>
+                    <td><img src="${iconUrl}" alt="${name}" width="30"></td>
+                    <td>${name}</td>
+                    <td>${symbol}</td>
+                    <td>$${price.toLocaleString()}</td>
+                    <td style="text-align:center;">${trend}</td>
+                    <td>${lastUpdated}</td>
+                </tr>
+            `;
+            tableBody.insertAdjacentHTML('beforeend', row);
+        });
+    } catch (err) {
+        console.error('Error fetching prices:', err);
+        alert('Failed to load crypto prices. Check console.');
+    }
+}
+
+async function updatePrices() {
+    const status = document.getElementById('update-status');
+    status.textContent = 'Updating... ⏳';
+
+    try {
+        const res = await fetch('/api/crypto/update-prices', { method: 'POST' });
+        const result = await res.json();
+
+        if (result.success) {
+            status.textContent = '✅ Prices updated successfully!';
+        } else {
+            status.textContent = '⚠️ Update failed: ' + (result.message || '');
+        }
+
+        // Refresh the table after updating
+        await fetchLatestPrices();
+    } catch (err) {
+        console.error('Error updating prices:', err);
+        status.textContent = '❌ Failed to update prices';
+    }
+}
+
+// Hook the button
+document.getElementById('update-prices-btn').addEventListener('click', updatePrices);
+
+// Load prices on page load
+fetchLatestPrices();
+</script>
+
+<style>
+#crypto-table th, #crypto-table td {
+    text-align: left;
+    padding: 10px;
+}
+
+#crypto-table tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+#crypto-table img {
+    vertical-align: middle;
+}
+</style>
